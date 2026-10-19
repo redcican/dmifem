@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dmifem"
-version = "0.1.0"
-description = "Dynamic multi-sensor inverse finite element method: the iFEM strain functional as the observation model of a kinematic Kalman filter and smoother"
+version = "0.2.0"
+description = "Dynamic multi-sensor inverse finite element method: the iFEM strain functional as the observation model of a kinematic Kalman filter and smoother with a correlated prior and an exact reduction"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

@@ -1,4 +1,9 @@
-"""Numerical check of Proposition 3.1: the static limit is the classical iFEM solution."""
+"""Numerical check of Proposition 3.1: the static limit is the classical iFEM solution.
+
+The prior rows are those of Eq. (prior) at unit reference length: one row per component and element
+for the axial strain and the twist, two per bending plane, and no transverse-shear row on
+Euler-Bernoulli elements. With the root clamped the rows have full column rank.
+"""
 
 import numpy as np
 
@@ -19,6 +24,10 @@ def test_static_limit_recovers_field_and_covariance(mesh):
 
 
 def test_unit_weight_precision_is_symmetric_positive(mesh):
-    k1 = assemble_prior(mesh).precision
+    prior = assemble_prior(mesh)
+    k1 = prior.precision
     np.testing.assert_allclose(k1, k1.T)
-    assert np.linalg.eigvalsh(k1).min() > 0.0
+    # K1 = rows^T rows is positive definite when the rows have full column rank
+    singular = np.linalg.svd(prior.rows, compute_uv=False)
+    assert singular.size == mesh.n_free
+    assert singular.min() > 1e-10 * singular.max()

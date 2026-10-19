@@ -1,9 +1,11 @@
 """Kinematic state-space model (manuscript Section 3.1, Eqs. ct–Q).
 
-The state stacks the reduced displacement, velocity and acceleration coordinates. Between
-samples the acceleration is locally constant with white-noise jerk of spatial covariance
-``Sigma_j``; the exact discretization over an interval ``dt`` is ``F = T(dt) (x) I_r`` and
-``Q = M(dt) (x) Sigma_j`` with the Kronecker product.
+The state stacks the reduced displacement, velocity and acceleration coordinates in the
+dimensionless time of Eq. (scaling). Between samples the acceleration is locally constant with
+white-noise jerk of spatial covariance ``Sigma_j``; the exact discretization over an interval
+``dt`` is ``F = T(dt) (x) I_r`` and ``Q = M(dt) (x) Sigma_j`` with the Kronecker product. With the
+structured covariance ``Sigma_j = q K1^{-1}`` of Eq. (sigmaj) and the K1-orthonormal basis, the
+reduced jerk covariance is ``q I_r``.
 """
 
 from __future__ import annotations
@@ -11,6 +13,13 @@ from __future__ import annotations
 import numpy as np
 
 from dmifem.elements.base import Array
+
+
+def covariance_root(cov: Array) -> Array:
+    """Factor ``A`` with ``A A^T = cov`` from the eigendecomposition (negative round-off clipped)."""
+    sym = 0.5 * (np.asarray(cov, dtype=float) + np.asarray(cov, dtype=float).T)
+    vals, vecs = np.linalg.eigh(sym)
+    return vecs * np.sqrt(np.clip(vals, 0.0, None))[None, :]
 
 
 def transition_core(dt: float) -> Array:

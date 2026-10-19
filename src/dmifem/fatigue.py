@@ -1,6 +1,14 @@
-"""Rainflow counting and damage-equivalent load (manuscript Section 3.6, Eq. del)."""
+"""Rainflow counting, damage-equivalent load and band substitution (manuscript Sections 3.6, 4.3).
+
+The damage ratio of two histories is ``r_D = r_DEL^m``, with ``r_DEL`` the ratio of their
+damage-equivalent loads. Band substitution replaces one frequency band of a reference history by
+the same band of a reconstruction and repeats the broadband rainflow count; the band ratios are
+not additive, because rainflow cycles combine content from all bands.
+"""
 
 from __future__ import annotations
+
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -71,3 +79,43 @@ def del_of_series(series: Array, slope: float, n_ref: float) -> float:
     """Rainflow count a history and return its damage-equivalent load."""
     ranges, _, counts = rainflow(series)
     return damage_equivalent_load(ranges, counts, slope, n_ref)
+
+
+def damage_ratio(del_ratio: float | Array, slope: float) -> float | Array:
+    """Damage ratio ``r_D = r_DEL^m`` for a ratio of damage-equivalent loads."""
+    return np.asarray(del_ratio, dtype=float) ** slope if np.ndim(del_ratio) else float(del_ratio) ** slope
+
+
+def band_substitution(
+    reference: Array,
+    reconstruction: Array,
+    fs: float,
+    bands: Sequence[tuple[float, float]],
+    slope: float,
+    n_ref: float = 1.0,
+) -> tuple[Array, float]:
+    """Damage ratio when one band of ``reference`` is replaced by the band of ``reconstruction``.
+
+    Bands are half-open ``[f_low, f_high)`` in the frequency unit of ``fs`` (use ``np.inf`` to
+    include the Nyquist bin). Returns the damage ratio per band and the ratio of the full
+    reconstruction, ``(DEL_rec / DEL_ref)^m``, which equals the substitution of all bands when the
+    bands cover the spectrum.
+    """
+    ref = np.asarray(reference, dtype=float).reshape(-1)
+    rec = np.asarray(reconstruction, dtype=float).reshape(-1)
+    if ref.size != rec.size:
+        raise ValueError("reference and reconstruction must have the same length")
+    del_ref = del_of_series(ref, slope, n_ref)
+    if del_ref <= 0.0:
+        raise ValueError("the reference history has no cycles")
+    freq = np.fft.rfftfreq(ref.size, 1.0 / fs)
+    spec_ref = np.fft.rfft(ref)
+    spec_rec = np.fft.rfft(rec)
+    ratios = []
+    for low, high in bands:
+        mask = (freq >= low) & (freq < high)
+        mixed = np.where(mask, spec_rec, spec_ref)
+        series = np.fft.irfft(mixed, ref.size)
+        ratios.append(float(del_of_series(series, slope, n_ref) / del_ref) ** slope)
+    total = float(del_of_series(rec, slope, n_ref) / del_ref) ** slope
+    return np.array(ratios), total

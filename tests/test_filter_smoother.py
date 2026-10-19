@@ -1,7 +1,8 @@
-"""Kalman filter, prior information update, gate and smoother on a scalar chain."""
+"""Kalman filter, pseudo-measurement update, gate, smoother and the exact likelihood."""
 
 import numpy as np
 
+from dmifem.chain import chain_filter, stationary_chain_covariance
 from dmifem.filter import ReducedObservation, prior_information_update, prior_square_root, run_filter
 from dmifem.grid import build_union_grid
 from dmifem.kinematics import ConstantAccelerationModel
@@ -87,3 +88,44 @@ def test_backward_sampling_matches_smoother_moments():
     sample_std = draws[:, :, 0].std(axis=0)
     np.testing.assert_allclose(sample_mean[20:], smoothed.mean[20:, 0], atol=0.02)
     np.testing.assert_allclose(sample_std[20:], np.sqrt(smoothed.cov[20:, 0, 0]), rtol=0.3)
+
+
+def _empty_record(n=60, dt=0.05):
+    times = dt * np.arange(n)
+    values = np.full((n, 1), np.nan)
+    data = SensorData({SensorType.DISPLACEMENT: (times, values)})
+    return build_union_grid({SensorType.DISPLACEMENT: times}), data
+
+
+def test_exact_likelihood_vanishes_without_physical_data():
+    """With every sample missing, p(y | z = 0) is the empty density: the exact likelihood is zero."""
+    q, lam, r = 3.0, 0.5, 2
+    grid, data = _empty_record()
+    model = ConstantAccelerationModel(q * np.eye(r))
+    rows = np.zeros((1, 3 * r))
+    rows[0, 0] = 1.0
+    blocks = {SensorType.DISPLACEMENT: ReducedObservation(rows, np.zeros(1), np.ones(1))}
+    dts = grid.intervals()
+    p1 = stationary_chain_covariance(q, lam, float(dts[0]))
+    cov0 = np.kron(p1, np.eye(r))
+    generic = run_filter(model, grid, blocks, data, None, lam, np.zeros(3 * r), cov0, gate_alpha=0.0)
+    assert generic.log_likelihood_physical == 0.0
+    assert abs(generic.log_likelihood) <= 1e-10 * abs(generic.log_likelihood_pseudo)
+    chain = chain_filter(q, lam, dts, p1, grid.n)
+    shortcut = run_filter(
+        model, grid, blocks, data, None, lam, np.zeros(3 * r), cov0, gate_alpha=0.0,
+        prior_log_density=r * chain.log_density,
+    )
+    np.testing.assert_allclose(shortcut.log_prior_density, generic.log_prior_density, rtol=1e-10)
+    assert abs(shortcut.log_likelihood) <= 1e-9 * abs(shortcut.log_likelihood_pseudo)
+
+
+def test_exact_likelihood_vanishes_without_data_for_a_nonzero_initial_mean():
+    q, lam, r = 3.0, 0.5, 1
+    grid, data = _empty_record(n=5)
+    model = ConstantAccelerationModel(q * np.eye(r))
+    rows = np.array([[1.0, 0.0, 0.0]])
+    blocks = {SensorType.DISPLACEMENT: ReducedObservation(rows, np.zeros(1), np.ones(1))}
+    mean0 = np.array([1.0, -0.5, 0.2])
+    result = run_filter(model, grid, blocks, data, None, lam, mean0, np.eye(3), gate_alpha=0.0)
+    assert abs(result.log_likelihood) <= 1e-12 * abs(result.log_likelihood_pseudo)

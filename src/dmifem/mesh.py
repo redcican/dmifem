@@ -73,6 +73,11 @@ class Mesh:
         self._free_index = None
 
     @property
+    def fixed_dofs(self) -> Array:
+        """Global indices of the fixed degrees of freedom, sorted."""
+        return np.array(sorted(self._fixed), dtype=int)
+
+    @property
     def free_dofs(self) -> Array:
         """Global indices of the free degrees of freedom."""
         if self._free_index is None:

@@ -1,8 +1,10 @@
 """Marginal-likelihood estimation of the hyperparameters (manuscript Section 3.5).
 
-``theta = {q, lambda, rho_s}`` is estimated on a training window by maximizing the log
-marginal likelihood that the filter provides through the prediction-error decomposition, over
-the physical channels and the prior rows. The search is derivative-free in ``log theta``.
+``theta = {q, lambda, rho_s}`` is estimated on a training window by maximizing the exact log
+marginal likelihood of Eq. (exactll), ``log p(Y | Y^lambda = 0)``, which the filter returns from
+the pseudo-measurement and physical innovations and the prior-only density of the scalar chain.
+All three quantities are dimensionless (Eq. scaling). The correlation length of the prior is set
+by the geometry and is not estimated. The search is derivative-free in ``log theta``.
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ def estimate_hyperparameters(
     lam_span: float = 1e4,
     rho_span: float = 1e2,
 ) -> Hyperparameters:
-    """Minimize ``objective`` (the negative log marginal likelihood) over ``log theta``.
+    """Minimize ``objective`` (the negative exact log marginal likelihood) over ``log theta``.
 
     The search is bounded to ``initial / span`` ... ``initial * span`` for each quantity; the
     marginal likelihood is nearly flat in ``lambda`` when every retained direction is

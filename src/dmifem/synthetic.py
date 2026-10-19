@@ -15,6 +15,7 @@ from scipy.linalg import expm
 from dmifem.elements.base import Array
 
 _BETA_L = np.array([1.8751041, 4.6940911, 7.8547574, 10.9955407, 14.1371684])
+_trapezoid = getattr(np, "trapezoid", None) or np.trapz  # numpy >= 2 renamed trapz
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class CantileverBeam:
     def modal_mass(self) -> Array:
         x = np.linspace(0.0, self.length, 2001)
         phi, _, _ = self.modes(x)
-        return self.mass_per_length * np.trapz(phi**2, x, axis=1)
+        return self.mass_per_length * _trapezoid(phi**2, x, axis=1)
 
 
 @dataclass(frozen=True)
